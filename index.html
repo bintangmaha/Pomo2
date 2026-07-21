@@ -552,6 +552,7 @@
   let pendingStation = null;
   let currentStation = 'off';
   let musicWantsPlay = false;
+  let musicIntent = false; // true when the user has chosen for music to be playing
 
   const STATIONS = {
     lofi: { id: 'X4VbdwhkE10', name: 'Lo-fi hip hop radio (Lofi Girl)' },
@@ -659,7 +660,7 @@
         onReady: function(){
           ytPlayer.setVolume(Number(musicVolume.value));
           musicPlayPause.disabled = false;
-          if(musicWantsPlay) ytPlayer.playVideo();
+          if(musicIntent) ytPlayer.playVideo();
           updateMusicIcon();
         },
         onStateChange: function(e){
@@ -678,6 +679,7 @@
     if(stationKey === 'off'){
       if(ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
       musicWantsPlay = false;
+      musicIntent = false;
       musicPlayPause.disabled = true;
       updateMusicIcon();
       return;
@@ -686,10 +688,12 @@
     if(!ytReady){
       pendingStation = stationKey;
       musicPlayPause.disabled = true;
+      musicIntent = true;
       return;
     }
 
     musicWantsPlay = true;
+    musicIntent = true;
     const videoId = STATIONS[stationKey].id;
     if(!ytPlayer){
       createPlayer(videoId);
@@ -702,8 +706,10 @@
   function toggleMusicPlayPause(){
     if(!ytPlayer || currentStation === 'off') return;
     if(musicWantsPlay){
+      musicIntent = false;
       ytPlayer.pauseVideo();
     } else {
+      musicIntent = true;
       ytPlayer.playVideo();
     }
   }
@@ -742,6 +748,17 @@
       osc.start(start);
       osc.stop(start + 0.55);
     });
+
+    // Di beberapa browser, membuat/melanjutkan AudioContext bisa
+    // ikut menghentikan audio dari iframe YouTube. Cek sesaat setelah
+    // chime selesai dan lanjutkan musik lagi kalau ternyata berhenti.
+    if(musicIntent && ytPlayer && ytPlayer.getPlayerState){
+      setTimeout(() => {
+        if(musicIntent && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING){
+          ytPlayer.playVideo();
+        }
+      }, 700);
+    }
   }
 
   const CIRC = 2 * Math.PI * 116;
